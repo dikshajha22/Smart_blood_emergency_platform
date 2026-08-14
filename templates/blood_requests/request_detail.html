@@ -1,0 +1,256 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}{{ blood_request.patient_name }} - blood request{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <div class="row row-wrap">
+      <span class="blood-badge blood-badge--lg">{{ blood_request.blood_group }}</span>
+      <div>
+        <h1 class="mb-0">{{ blood_request.patient_name }}</h1>
+        <p class="mb-0">
+          <span class="urgency urgency--{{ blood_request.urgency }}">{{ blood_request.get_urgency_display }}</span>
+          <span class="status status--{{ blood_request.status }}" id="status-pill">{{ blood_request.get_status_display }}</span>
+          &middot; raised by {{ blood_request.requester_name }} {{ blood_request.created_at|naturaltime }}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  {% if is_owner and blood_request.is_open %}
+    <div class="btn-group">
+      <a class="btn btn-primary" href="{% url 'request_matches' blood_request.pk %}">
+        <i class="fa-solid fa-brain" aria-hidden="true"></i> Find more donors
+      </a>
+      <form method="post" action="{% url 'cancel_request' blood_request.pk %}"
+            data-confirm="Cancel this request? All pending donors will be notified.">
+        {% csrf_token %}
+        <button class="btn btn-danger" type="submit">
+          <i class="fa-solid fa-ban" aria-hidden="true"></i> Cancel request
+        </button>
+      </form>
+    </div>
+  {% endif %}
+</div>
+
+{% if invitation %}
+  {# The viewer is an invited donor, not the requester. #}
+  <div class="card card--accent mb-5">
+    <div class="card__header">
+      <h2><i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i> You were asked to donate</h2>
+      <span class="status status--{{ invitation.status }}">{{ invitation.get_status_display }}</span>
+    </div>
+    <div class="card__body">
+      {% if invitation.message %}
+        <blockquote class="text-muted" style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--border);">
+          {{ invitation.message }}
+        </blockquote>
+      {% endif %}
+      <div class="row row-wrap mb-4">
+        <span class="badge">Match score {{ invitation.score_percent }}%</span>
+        <span class="badge">{{ invitation.distance_display }} away</span>
+        {% if invitation.expires_at %}
+          <span class="badge badge--amber">Expires {{ invitation.expires_at|naturaltime }}</span>
+        {% endif %}
+      </div>
+
+      {% if invitation.is_actionable %}
+        <div class="row row-wrap">
+          <form method="post" action="{% url 'respond_invitation' invitation.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="accept">
+            <button class="btn btn-success btn-lg" type="submit">
+              <i class="fa-solid fa-check" aria-hidden="true"></i> Accept and donate
+            </button>
+          </form>
+          <form method="post" action="{% url 'respond_invitation' invitation.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="decline">
+            <button class="btn btn-secondary btn-lg" type="submit">
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i> Decline
+            </button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
+<div class="grid grid-sidebar">
+  <div class="stack">
+    {% if is_owner %}
+      <div class="card">
+        <div class="card__header">
+          <h2><i class="fa-solid fa-users" aria-hidden="true"></i> Donors contacted
+            (<span id="invited-count">{{ invitations|length }}</span>)
+          </h2>
+          <span class="text-small text-muted">Ordered by match score</span>
+        </div>
+
+        {% if invitations %}
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+                <tr><th>Donor</th><th>Group</th><th>Match</th><th>Distance</th><th>Status</th><th>Contact</th><th></th></tr>
+              </thead>
+              <tbody>
+                {% for inv in invitations %}
+                  <tr>
+                    <td>
+                      <a href="{% url 'donor_detail' inv.donor.pk %}">{{ inv.donor.user.display_name }}</a>
+                      {% if inv.donor.is_verified %}
+                        <i class="fa-solid fa-circle-check" style="color:var(--blue-500);" title="Verified" aria-hidden="true"></i>
+                      {% endif %}
+                    </td>
+                    <td><span class="blood-badge">{{ inv.donor.blood_group }}</span></td>
+                    <td>{{ inv.score_percent }}%</td>
+                    <td>{{ inv.distance_display }}</td>
+                    <td>
+                      <span class="status status--{{ inv.status }}">{{ inv.get_status_display }}</span>
+                      {% if inv.decline_reason %}
+                        <div class="text-small text-muted">{{ inv.decline_reason }}</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if inv.was_accepted %}
+                        <a href="tel:{{ inv.donor.user.phone }}" class="mono">{{ inv.donor.user.phone|default:"no phone" }}</a>
+                      {% else %}
+                        <span class="text-muted text-small">Hidden</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if inv.status == 'ACCEPTED' %}
+                        <form method="post" action="{% url 'confirm_donation' inv.pk %}"
+                              data-confirm="Confirm that this donor actually donated?">
+                          {% csrf_token %}
+                          <button class="btn btn-success btn-sm" type="submit">
+                            <i class="fa-solid fa-check-double" aria-hidden="true"></i> Confirm
+                          </button>
+                        </form>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="empty">
+            <div class="empty__icon"><i class="fa-solid fa-user-plus" aria-hidden="true"></i></div>
+            <h3>No donors contacted yet</h3>
+            <p>Open the ranked donor list and send this request to the best matches.</p>
+            <a class="btn btn-primary" href="{% url 'request_matches' blood_request.pk %}">Find donors</a>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card__header"><h2><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Request details</h2></div>
+      <div class="card__body">
+        <div class="form-grid">
+          <div><span class="stat__label">Patient age</span><div>{{ blood_request.patient_age|default:"Not given" }}</div></div>
+          <div><span class="stat__label">Units required</span><div>{{ blood_request.units_required }}</div></div>
+          <div><span class="stat__label">Needed by</span><div>{{ blood_request.needed_by|date:"d M Y, H:i" }}</div></div>
+          <div><span class="stat__label">Search radius</span><div>{{ blood_request.effective_radius_km|floatformat:0 }} km</div></div>
+          <div><span class="stat__label">Donation location</span><div>{{ blood_request.hospital_name|default:blood_request.location_display }}</div></div>
+          <div><span class="stat__label">Contact</span>
+            <div>
+              {% if is_owner or invitation.was_accepted %}
+                {{ blood_request.contact_phone|default:"Not given" }}
+              {% else %}
+                <span class="text-muted">Shared once you accept</span>
+              {% endif %}
+            </div>
+          </div>
+          {% if blood_request.reason %}
+            <div class="span-2"><span class="stat__label">Reason</span><div>{{ blood_request.reason }}</div></div>
+          {% endif %}
+          {% if blood_request.notes_for_donor %}
+            <div class="span-2"><span class="stat__label">Note for donors</span><div>{{ blood_request.notes_for_donor }}</div></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card__header"><h3>Progress</h3></div>
+      <div class="card__body stack">
+        <div>
+          <div class="row-between text-small text-muted">
+            <span>Units fulfilled</span>
+            <span id="fulfil-text">{{ blood_request.units_fulfilled }} / {{ blood_request.units_required }}</span>
+          </div>
+          <div class="progress progress--lg mt-4">
+            <div class="progress__bar {% if blood_request.fulfilment_percent == 100 %}progress__bar--green{% endif %}"
+                 id="fulfil-bar" style="width: {{ blood_request.fulfilment_percent }}%;"></div>
+          </div>
+        </div>
+        <div class="row-between"><span class="text-muted">Accepted</span><strong id="accepted-count">{{ accepted|length }}</strong></div>
+        <div class="row-between"><span class="text-muted">Awaiting reply</span><strong id="pending-count">--</strong></div>
+        <div class="row-between">
+          <span class="text-muted">Time left</span>
+          <strong>
+            {% if blood_request.hours_remaining > 0 %}
+              {{ blood_request.needed_by|timeuntil }}
+            {% else %}
+              <span style="color:var(--red-600);">Deadline passed</span>
+            {% endif %}
+          </strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__header"><h3>Compatible donor groups</h3></div>
+      <div class="card__body chip-row">
+        {% for group in blood_request.acceptable_donor_groups %}
+          <span class="blood-badge blood-badge--outline">{{ group }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if is_owner %}
+<script>
+  /**
+   * Poll the request status so the owner sees acceptances arrive without
+   * refreshing. Stops once the request closes.
+   */
+  (function () {
+    var url = "{% url 'api_request_status' blood_request.pk %}";
+    var timer = setInterval(function () {
+      if (document.hidden) return;
+      fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data) return;
+          document.getElementById("fulfil-text").textContent =
+            data.units_fulfilled + " / " + data.units_required;
+          document.getElementById("fulfil-bar").style.width = data.fulfilment_percent + "%";
+          document.getElementById("accepted-count").textContent = data.accepted;
+          document.getElementById("pending-count").textContent = data.pending;
+          document.getElementById("invited-count").textContent = data.invited;
+
+          var pill = document.getElementById("status-pill");
+          if (pill && pill.textContent.trim() !== data.status_display) {
+            // Status changed underneath us - reload to render the new actions.
+            window.location.reload();
+          }
+          if (data.status !== "SEARCHING" && data.status !== "PARTIAL") {
+            clearInterval(timer);
+          }
+        })
+        .catch(function () { /* transient network issue: try again next tick */ });
+    }, 20000);
+  })();
+</script>
+{% endif %}
+{% endblock %}

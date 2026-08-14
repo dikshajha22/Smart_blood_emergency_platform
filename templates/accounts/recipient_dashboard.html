@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load ui humanize %}
+
+{% block title %}My dashboard - LifeLink{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Hello, {{ user.first_name|default:user.username }}</h1>
+    <p>Search the live map for compatible donors near you and send them a request.</p>
+  </div>
+  <div class="btn-group">
+    <a class="btn btn-secondary" href="{% url 'donor_map' %}">
+      <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Search the map
+    </a>
+    <a class="btn btn-primary" href="{% url 'create_request' %}">
+      <i class="fa-solid fa-plus" aria-hidden="true"></i> New blood request
+    </a>
+  </div>
+</div>
+
+{% if not profile.is_complete %}
+  <div class="card card--accent mb-4">
+    <div class="card__body row-between row-wrap">
+      <div>
+        <h3 class="mb-0"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Finish your profile ({{ profile.completion_percent }}%)</h3>
+        <p class="text-muted mb-0">
+          Missing: {{ profile.missing_fields|join:", " }}.
+          {% if not profile.has_location %}Donors are matched by distance from your pin.{% endif %}
+        </p>
+      </div>
+      <a class="btn btn-primary" href="{% url 'recipient_profile' %}">Complete profile</a>
+    </div>
+  </div>
+{% endif %}
+
+<div class="grid grid-4 mb-5">
+  <div class="stat stat--red">
+    <span class="stat__icon"><i class="fa-solid fa-droplet" aria-hidden="true"></i></span>
+    <span class="stat__label">Blood group needed</span>
+    <span class="stat__value">{{ profile.blood_group|default:"--" }}</span>
+    <span class="stat__hint">
+      {% if profile.acceptable_donor_groups %}Can receive from {{ profile.acceptable_donor_groups|join:", " }}{% else %}Set your group{% endif %}
+    </span>
+  </div>
+  <div class="stat stat--blue">
+    <span class="stat__icon"><i class="fa-solid fa-file-medical" aria-hidden="true"></i></span>
+    <span class="stat__label">Total requests</span>
+    <span class="stat__value">{{ stats.total_requests }}</span>
+  </div>
+  <div class="stat stat--amber">
+    <span class="stat__icon"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i></span>
+    <span class="stat__label">Still searching</span>
+    <span class="stat__value">{{ stats.open }}</span>
+  </div>
+  <div class="stat stat--green">
+    <span class="stat__icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+    <span class="stat__label">Fulfilled</span>
+    <span class="stat__value">{{ stats.fulfilled }}</span>
+  </div>
+</div>
+
+<div class="grid grid-sidebar">
+  <div class="card">
+    <div class="card__header">
+      <h2><i class="fa-solid fa-file-medical" aria-hidden="true"></i> Your requests</h2>
+      <a class="btn btn-ghost btn-sm" href="{% url 'my_requests' %}">See all</a>
+    </div>
+
+    {% if requests %}
+      <div class="list">
+        {% for req in requests %}
+          <div class="list__item">
+            <span class="blood-badge">{{ req.blood_group }}</span>
+            <div class="list__body">
+              <div class="list__title">
+                <a href="{% url 'request_detail' req.pk %}">{{ req.patient_name }}</a>
+                &mdash; {{ req.units_required }} unit(s)
+              </div>
+              <div class="list__meta">
+                <span class="urgency urgency--{{ req.urgency }}">{{ req.get_urgency_display }}</span>
+                <span class="status status--{{ req.status }}">{{ req.get_status_display }}</span>
+                &middot; {{ req.invited }} invited, {{ req.accepted }} accepted
+                &middot; needed by {{ req.needed_by|date:"d M, H:i" }}
+              </div>
+              <div class="progress mt-4" style="max-width:220px;">
+                <div class="progress__bar {% if req.fulfilment_percent == 100 %}progress__bar--green{% endif %}"
+                     style="width: {{ req.fulfilment_percent }}%;"></div>
+              </div>
+            </div>
+            {% if req.is_open %}
+              <a class="btn btn-primary btn-sm" href="{% url 'request_matches' req.pk %}">
+                <i class="fa-solid fa-brain" aria-hidden="true"></i> Find donors
+              </a>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <div class="empty__icon"><i class="fa-solid fa-file-medical" aria-hidden="true"></i></div>
+        <h3>No requests yet</h3>
+        <p>When you need blood, create a request and we will rank every compatible donor nearby.</p>
+        <a class="btn btn-primary" href="{% url 'create_request' %}">Create your first request</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    <div class="card card--accent">
+      <div class="card__header"><h3>Need blood now?</h3></div>
+      <div class="card__body stack">
+        <p class="text-muted mb-0">
+          Mark a request <strong>Critical</strong> and the matching engine will invite the
+          best-ranked donors immediately, without waiting for you to choose.
+        </p>
+        <a class="btn btn-primary btn-block" href="{% url 'create_request' %}">
+          <i class="fa-solid fa-bolt" aria-hidden="true"></i> Create urgent request
+        </a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__header"><h3>Your details</h3></div>
+      <div class="card__body stack">
+        <div class="row-between">
+          <span class="text-muted">Location</span>
+          <span class="text-right">{{ profile.location_display|truncatechars:26 }}</span>
+        </div>
+        <div class="row-between">
+          <span class="text-muted">Emergency contact</span>
+          <span>{{ profile.emergency_contact_phone|default:"Not set" }}</span>
+        </div>
+        <div class="row-between">
+          <span class="text-muted">Preferred hospital</span>
+          <span class="text-right">{{ profile.preferred_hospital.hospital_name|default:"No preference" }}</span>
+        </div>
+        <a class="btn btn-secondary btn-block" href="{% url 'recipient_profile' %}">Edit profile</a>
+      </div>
+    </div>
+
+    {% if profile.acceptable_donor_groups %}
+      <div class="card">
+        <div class="card__header"><h3>Compatible donors</h3></div>
+        <div class="card__body">
+          <p class="text-small text-muted">
+            With blood group <strong>{{ profile.blood_group }}</strong> you can safely receive from:
+          </p>
+          <div class="chip-row">
+            {% for group in profile.acceptable_donor_groups %}
+              <span class="blood-badge blood-badge--outline">{{ group }}</span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

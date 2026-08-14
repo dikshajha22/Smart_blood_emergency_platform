@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Notifications - LifeLink{% endblock %}
+{% block container_class %}container container-narrow{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Notifications</h1>
+    <p>{% if unread_total %}{{ unread_total }} unread{% else %}All caught up{% endif %}.</p>
+  </div>
+  {% if unread_total %}
+    <form method="post" action="{% url 'mark_all_read' %}">
+      {% csrf_token %}
+      <button class="btn btn-secondary" type="submit">
+        <i class="fa-solid fa-check-double" aria-hidden="true"></i> Mark all read
+      </button>
+    </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  {% if notifications %}
+    {% for item in notifications %}
+      <div class="notif {% if item.is_unread %}is-unread{% endif %}">
+        <span class="notif__icon notif__icon--{{ item.tone }}">
+          <i class="fa-solid {{ item.icon }}" aria-hidden="true"></i>
+        </span>
+        <div style="flex:1; min-width:0;">
+          <div class="notif__title">
+            <a href="{% url 'open_notification' item.pk %}">{{ item.title }}</a>
+          </div>
+          {% if item.body %}<div class="notif__body">{{ item.body }}</div>{% endif %}
+        </div>
+        <span class="notif__time">{{ item.created_at|naturaltime }}</span>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">
+      <div class="empty__icon"><i class="fa-solid fa-bell-slash" aria-hidden="true"></i></div>
+      <h3>Nothing here yet</h3>
+      <p>Requests, acceptances and reminders will appear in this feed.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

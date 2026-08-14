@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load ui humanize %}
+
+{% block title %}{{ donor.user.display_name }} - donor profile{% endblock %}
+{% block container_class %}container container-narrow{% endblock %}
+{% block map_assets %}{% include "partials/map_assets.html" %}{% endblock %}
+
+{% block content %}
+<div class="card card--accent mb-4">
+  <div class="card__body">
+    <div class="row row-wrap mb-4">
+      <span class="avatar avatar-lg">
+        {% if donor.user.avatar %}<img src="{{ donor.user.avatar.url }}" alt="">{% else %}{{ donor.user|initials }}{% endif %}
+      </span>
+      <div style="flex:1; min-width:180px;">
+        <h1 class="mb-0">{{ donor.user.display_name }}</h1>
+        <p class="text-muted mb-0">
+          {{ donor.location_display }}
+          {% if donor.age %}&middot; {{ donor.age }} years{% endif %}
+          {% if donor.gender %}&middot; {{ donor.get_gender_display }}{% endif %}
+        </p>
+        <div class="row row-wrap mt-4">
+          <span class="blood-badge blood-badge--lg">{{ donor.blood_group }}</span>
+          <span class="badge {% if donor.availability_status == 'AVAILABLE' %}badge--green{% else %}badge--muted{% endif %}">
+            {{ donor.get_availability_status_display }}
+          </span>
+          {% if donor.is_verified %}
+            <span class="badge badge--blue"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Verified</span>
+          {% endif %}
+          {% if donor.is_eligible %}
+            <span class="badge badge--green">Eligible now</span>
+          {% else %}
+            <span class="badge badge--amber">Resting</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if donor.bio %}
+      <p class="text-muted mb-0">{{ donor.bio }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid grid-3 mb-4">
+  <div class="stat stat--red">
+    <span class="stat__label">Donations</span>
+    <span class="stat__value">{{ donor.total_donations }}</span>
+  </div>
+  <div class="stat stat--blue">
+    <span class="stat__label">Reliability</span>
+    <span class="stat__value">{{ donor.reliability_percent }}%</span>
+  </div>
+  <div class="stat stat--green">
+    <span class="stat__label">Accept rate</span>
+    <span class="stat__value">{{ donor.acceptance_rate|percentage }}</span>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card__header"><h2>Donor details</h2></div>
+  <div class="card__body">
+    <div class="form-grid">
+      <div><span class="stat__label">Blood group</span><div>{{ donor.blood_group }}</div></div>
+      <div><span class="stat__label">Reach</span>
+        <div class="text-small text-muted">Can help {{ donor.versatility|percentage }} of patients</div>
+      </div>
+      <div><span class="stat__label">Willing to travel</span><div>{{ donor.max_travel_km|floatformat:0 }} km</div></div>
+      <div><span class="stat__label">Contact hours</span><div>{{ donor.available_from_hour }}:00 - {{ donor.available_to_hour }}:00</div></div>
+      <div><span class="stat__label">Last donation</span>
+        <div>{% if donor.last_donation_date %}{{ donor.last_donation_date|date:"d M Y" }}{% else %}No record{% endif %}</div>
+      </div>
+      <div><span class="stat__label">Next eligible</span>
+        <div>{% if donor.is_eligible %}Now{% elif donor.next_eligible_on %}{{ donor.next_eligible_on|date:"d M Y" }}{% else %}--{% endif %}</div>
+      </div>
+
+      {% if can_see_contact %}
+        <div class="span-2">
+          <div class="alert alert-success" style="margin:0;">
+            <span class="alert__icon"><i class="fa-solid fa-phone" aria-hidden="true"></i></span>
+            <div>
+              <strong>Contact details</strong><br>
+              <a href="tel:{{ donor.user.phone }}" class="mono">{{ donor.user.phone|default:"No phone on file" }}</a>
+              &middot;
+              <a href="mailto:{{ donor.user.email }}">{{ donor.user.email }}</a>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="span-2">
+          <div class="alert alert-info" style="margin:0;">
+            <span class="alert__icon"><i class="fa-solid fa-lock" aria-hidden="true"></i></span>
+            <span>Contact details become visible once this donor accepts one of your requests.</span>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if donor.has_location %}
+  <div class="card mb-4">
+    <div class="card__header"><h2>Approximate location</h2></div>
+    <div class="card__body">
+      <div id="donor-map" class="map-canvas map-canvas--short"></div>
+      <p class="text-small text-muted mt-4 mb-0">
+        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+        Shown as a general area, not an exact street address.
+      </p>
+    </div>
+  </div>
+{% endif %}
+
+{% if recent_donations %}
+  <div class="card">
+    <div class="card__header"><h2>Donation history</h2></div>
+    <div class="list">
+      {% for donation in recent_donations %}
+        <div class="list__item">
+          <div class="list__body">
+            <div class="list__title">{{ donation.donated_on|date:"d M Y" }}</div>
+            <div class="list__meta">{{ donation.units }} unit(s){% if donation.location %} &middot; {{ donation.location }}{% endif %}</div>
+          </div>
+          <i class="fa-solid fa-droplet" style="color:var(--red-500);" aria-hidden="true"></i>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if donor.has_location %}
+{{ donor_point|json_script:"donor-point" }}
+<script>
+  window.addEventListener("load", function () {
+    var el = document.getElementById("donor-map");
+    if (!el || typeof L === "undefined") return;
+
+    // Coordinates come through json_script, so no locale-dependent number
+    // formatting can corrupt the decimal separator.
+    var point = JSON.parse(document.getElementById("donor-point").textContent);
+
+    var map = L.map(el, { scrollWheelZoom: false }).setView([point.lat, point.lng], 13);
+    L.tileLayer(window.MAP_TILE_URL, {
+      attribution: window.MAP_TILE_ATTRIBUTION, maxZoom: 19,
+    }).addTo(map);
+
+    // A circle rather than a precise pin: the donor's exact address stays private.
+    L.circle([point.lat, point.lng], {
+      radius: 800,
+      color: "#e11d48", weight: 2, fillColor: "#e11d48", fillOpacity: 0.15,
+    }).addTo(map);
+
+    setTimeout(function () { map.invalidateSize(); }, 200);
+  });
+</script>
+{% endif %}
+{% endblock %}

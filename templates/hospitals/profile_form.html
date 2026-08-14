@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}Hospital profile - LifeLink{% endblock %}
+{% block map_assets %}{% include "partials/map_assets.html" %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Hospital profile</h1>
+    <p>Pin your facility so patients and donors can find you on the map.</p>
+  </div>
+  <div class="badge {% if profile.is_complete %}badge--green{% else %}badge--amber{% endif %}">
+    {{ profile.completion_percent }}% complete
+  </div>
+</div>
+
+{% if form.non_field_errors %}
+  <div class="alert alert-error mb-4">
+    <span class="alert__icon"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i></span>
+    <div>{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>
+  </div>
+{% endif %}
+
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  <div class="grid grid-sidebar">
+    <div class="stack">
+      <div class="card">
+        <div class="card__header">
+          <h2><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Pin your facility</h2>
+          <span class="badge badge--red">Required</span>
+        </div>
+        <div class="card__body">{% include "partials/map_picker.html" %}</div>
+      </div>
+
+      <div class="card">
+        <div class="card__header"><h2><i class="fa-solid fa-hospital" aria-hidden="true"></i> Facility details</h2></div>
+        <div class="card__body">
+          <div class="form-grid">
+            {% include "partials/field.html" with field=form.hospital_name wrapper_class="span-2" %}
+            {% include "partials/field.html" with field=form.license_number %}
+            {% include "partials/field.html" with field=form.bed_count %}
+            {% include "partials/field.html" with field=form.contact_person %}
+            {% include "partials/field.html" with field=form.emergency_phone %}
+            {% include "partials/field.html" with field=form.website wrapper_class="span-2" %}
+            {% include "partials/field.html" with field=form.description wrapper_class="span-2" %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__header"><h2><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Address</h2></div>
+        <div class="card__body">
+          <div class="form-grid">
+            {% include "partials/field.html" with field=form.address wrapper_class="span-2" %}
+            {% include "partials/field.html" with field=form.city %}
+            {% include "partials/field.html" with field=form.state %}
+            {% include "partials/field.html" with field=form.postal_code %}
+            {% include "partials/field.html" with field=form.country %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card__header"><h3>Capabilities</h3></div>
+        <div class="card__body stack">
+          {% include "partials/field.html" with field=form.has_blood_bank %}
+          {% include "partials/field.html" with field=form.is_24_hours %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__body">
+          <button class="btn btn-primary btn-block btn-lg" type="submit">
+            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save profile
+          </button>
+          <a class="btn btn-ghost btn-block mt-4" href="{% url 'hospital_dashboard' %}">Cancel</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.addEventListener("load", function () {
+    new LocationPicker({
+      mapId: "location-map",
+      config: JSON.parse(document.getElementById("map-config").textContent),
+    });
+  });
+</script>
+{% endblock %}

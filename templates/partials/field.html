@@ -1,0 +1,26 @@
+{% comment %}
+Renders one bound form field with label, help text and errors.
+Usage: {% include "partials/field.html" with field=form.city %}
+Optional: wrapper_class="span-2"
+{% endcomment %}
+<div class="field {% if field.errors %}field--invalid{% endif %} {{ wrapper_class }}">
+  {% if field.field.widget.input_type == 'checkbox' %}
+    <label class="field-check">
+      {{ field }}
+      <span class="field-check__text">
+        <span class="field-check__label">{{ field.label }}</span>
+        {% if field.help_text %}<span class="field__help">{{ field.help_text }}</span>{% endif %}
+      </span>
+    </label>
+  {% else %}
+    <label class="field__label" for="{{ field.id_for_label }}">
+      {{ field.label }}{% if field.field.required %}<span class="req" aria-hidden="true">*</span>{% endif %}
+    </label>
+    {{ field }}
+    {% if field.help_text %}<span class="field__help">{{ field.help_text }}</span>{% endif %}
+  {% endif %}
+
+  {% for error in field.errors %}
+    <span class="field__error"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> {{ error }}</span>
+  {% endfor %}
+</div>

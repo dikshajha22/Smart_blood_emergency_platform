@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign in - LifeLink{% endblock %}
+{% block container_class %}container container-narrow{% endblock %}
+
+{% block content %}
+<div class="card card--accent">
+  <div class="card__body">
+    <div class="text-center mb-5">
+      <h1>Welcome back</h1>
+      <p class="text-muted">Sign in with your username or email address.</p>
+    </div>
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-error mb-4">
+        <span class="alert__icon"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i></span>
+        <div>
+          {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate class="stack">
+      {% csrf_token %}
+      {% include "partials/field.html" with field=form.username %}
+      {% include "partials/field.html" with field=form.password %}
+
+      <button class="btn btn-primary btn-block btn-lg" type="submit">
+        <i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i> Sign in
+      </button>
+    </form>
+
+    <div class="divider"></div>
+
+    <p class="text-center text-muted mb-0">
+      New here? <a href="{% url 'register' %}">Create an account</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

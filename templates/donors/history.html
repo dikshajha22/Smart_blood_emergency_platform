@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}My donation history - LifeLink{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>My history</h1>
+    <p>{{ profile.total_donations }} donation(s) recorded &middot; {{ profile.invitations_received }} request(s) received.</p>
+  </div>
+  <a class="btn btn-secondary" href="{% url 'donor_dashboard' %}">Back to dashboard</a>
+</div>
+
+<div class="grid grid-4 mb-5">
+  <div class="stat stat--red">
+    <span class="stat__label">Donations</span><span class="stat__value">{{ profile.total_donations }}</span>
+  </div>
+  <div class="stat stat--green">
+    <span class="stat__label">Accepted</span><span class="stat__value">{{ profile.invitations_accepted }}</span>
+  </div>
+  <div class="stat stat--amber">
+    <span class="stat__label">Declined</span><span class="stat__value">{{ profile.invitations_declined }}</span>
+  </div>
+  <div class="stat stat--blue">
+    <span class="stat__label">Reliability</span><span class="stat__value">{{ profile.reliability_percent }}%</span>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card__header"><h2><i class="fa-solid fa-droplet" aria-hidden="true"></i> Donations</h2></div>
+    {% if donations %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Date</th><th>Units</th><th>For</th></tr></thead>
+          <tbody>
+            {% for donation in donations %}
+              <tr>
+                <td>{{ donation.donated_on|date:"d M Y" }}</td>
+                <td>{{ donation.units }}</td>
+                <td>{{ donation.blood_request.patient_name|default:"Not linked" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty">
+        <div class="empty__icon"><i class="fa-solid fa-droplet" aria-hidden="true"></i></div>
+        <h3>No donations recorded</h3>
+        <p>Once a requester confirms your donation it will appear here.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card__header"><h2><i class="fa-solid fa-envelope" aria-hidden="true"></i> All requests received</h2></div>
+    {% if invitations %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Patient</th><th>Group</th><th>Answer</th><th>When</th></tr></thead>
+          <tbody>
+            {% for item in invitations %}
+              <tr>
+                <td>{{ item.blood_request.patient_name }}</td>
+                <td><span class="blood-badge">{{ item.blood_request.blood_group }}</span></td>
+                <td><span class="status status--{{ item.status }}">{{ item.get_status_display }}</span></td>
+                <td class="text-muted">{{ item.created_at|naturaltime }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty">
+        <div class="empty__icon"><i class="fa-solid fa-envelope" aria-hidden="true"></i></div>
+        <h3>No requests yet</h3>
+        <p>Keep your profile complete and available so patients can find you.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

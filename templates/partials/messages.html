@@ -1,0 +1,18 @@
+{% if messages %}
+  <div class="messages" role="status" aria-live="polite">
+    {% for message in messages %}
+      <div class="alert {{ message.tags }}">
+        <span class="alert__icon" aria-hidden="true">
+          {% if 'success' in message.tags %}<i class="fa-solid fa-circle-check"></i>
+          {% elif 'error' in message.tags %}<i class="fa-solid fa-circle-exclamation"></i>
+          {% elif 'warning' in message.tags %}<i class="fa-solid fa-triangle-exclamation"></i>
+          {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+        </span>
+        <span>{{ message }}</span>
+        <button class="alert__close" type="button" aria-label="Dismiss">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Blood inventory - LifeLink{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Blood inventory</h1>
+    <p>Track units on hand per group. Groups at or below their threshold are flagged as low.</p>
+  </div>
+  <a class="btn btn-secondary" href="{% url 'hospital_dashboard' %}">Back to dashboard</a>
+</div>
+
+<div class="grid grid-sidebar-left">
+  <div class="card">
+    <div class="card__header"><h2>Add or update stock</h2></div>
+    <div class="card__body">
+      <form method="post" class="stack" novalidate>
+        {% csrf_token %}
+        {% include "partials/field.html" with field=form.blood_group %}
+        {% include "partials/field.html" with field=form.units_available %}
+        {% include "partials/field.html" with field=form.critical_threshold %}
+        <button class="btn btn-primary btn-block" type="submit">
+          <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save
+        </button>
+        <p class="text-small text-muted mb-0">
+          Saving an existing group updates it rather than creating a duplicate.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__header"><h2>Current stock</h2></div>
+    {% if inventory %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Group</th><th>Units</th><th>Threshold</th><th>State</th><th></th></tr></thead>
+          <tbody>
+            {% for item in inventory %}
+              <tr>
+                <td><span class="blood-badge">{{ item.blood_group }}</span></td>
+                <td><strong>{{ item.units_available }}</strong></td>
+                <td class="text-muted">{{ item.critical_threshold }}</td>
+                <td>
+                  {% if item.is_low %}
+                    <span class="badge badge--amber"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Low</span>
+                  {% else %}
+                    <span class="badge badge--green">Healthy</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <form method="post" action="{% url 'delete_inventory' item.pk %}"
+                        data-confirm="Remove the {{ item.blood_group }} stock entry?">
+                    {% csrf_token %}
+                    <button class="btn btn-danger btn-sm" type="submit">
+                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty">
+        <div class="empty__icon"><i class="fa-solid fa-warehouse" aria-hidden="true"></i></div>
+        <h3>No stock recorded</h3>
+        <p>Add your first blood group entry using the form.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

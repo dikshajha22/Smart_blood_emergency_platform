@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block title %}My recipient profile - LifeLink{% endblock %}
+{% block map_assets %}{% include "partials/map_assets.html" %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Your recipient profile</h1>
+    <p>Your pinned location is the centre of every donor search you run.</p>
+  </div>
+  <div class="badge {% if profile.is_complete %}badge--green{% else %}badge--amber{% endif %}">
+    {{ profile.completion_percent }}% complete
+  </div>
+</div>
+
+{% if form.non_field_errors %}
+  <div class="alert alert-error mb-4">
+    <span class="alert__icon"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i></span>
+    <div>{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>
+  </div>
+{% endif %}
+
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  <div class="grid grid-sidebar">
+    <div class="stack">
+      <div class="card">
+        <div class="card__header">
+          <h2><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Pin your location</h2>
+          <span class="badge badge--red">Required</span>
+        </div>
+        <div class="card__body">{% include "partials/map_picker.html" %}</div>
+      </div>
+
+      <div class="card">
+        <div class="card__header"><h2><i class="fa-solid fa-droplet" aria-hidden="true"></i> Medical details</h2></div>
+        <div class="card__body">
+          <div class="form-grid">
+            {% include "partials/field.html" with field=form.blood_group %}
+            {% include "partials/field.html" with field=form.gender %}
+            {% include "partials/field.html" with field=form.date_of_birth %}
+            {% include "partials/field.html" with field=form.medical_condition %}
+            {% include "partials/field.html" with field=form.preferred_hospital wrapper_class="span-2" %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__header"><h2><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Address</h2></div>
+        <div class="card__body">
+          <div class="form-grid">
+            {% include "partials/field.html" with field=form.address wrapper_class="span-2" %}
+            {% include "partials/field.html" with field=form.city %}
+            {% include "partials/field.html" with field=form.state %}
+            {% include "partials/field.html" with field=form.postal_code %}
+            {% include "partials/field.html" with field=form.country %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card__header"><h3>Emergency contact</h3></div>
+        <div class="card__body stack">
+          {% include "partials/field.html" with field=form.emergency_contact_name %}
+          {% include "partials/field.html" with field=form.emergency_contact_phone %}
+        </div>
+      </div>
+
+      {% if profile.blood_group %}
+        <div class="card">
+          <div class="card__header"><h3>You can receive from</h3></div>
+          <div class="card__body chip-row">
+            {% for group in profile.acceptable_donor_groups %}
+              <span class="blood-badge blood-badge--outline">{{ group }}</span>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="card__body">
+          <button class="btn btn-primary btn-block btn-lg" type="submit">
+            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save profile
+          </button>
+          <a class="btn btn-ghost btn-block mt-4" href="{% url 'recipient_dashboard' %}">Cancel</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.addEventListener("load", function () {
+    new LocationPicker({
+      mapId: "location-map",
+      config: JSON.parse(document.getElementById("map-config").textContent),
+    });
+  });
+</script>
+{% endblock %}

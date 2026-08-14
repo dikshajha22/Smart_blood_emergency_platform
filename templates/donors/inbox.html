@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}My request inbox - LifeLink{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Requests for you</h1>
+    <p>
+      {% if pending %}
+        {{ pending|length }} patient(s) are waiting on your answer.
+      {% else %}
+        Nothing waiting right now.
+      {% endif %}
+    </p>
+  </div>
+  <a class="btn btn-secondary" href="{% url 'donor_dashboard' %}">
+    <i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Dashboard
+  </a>
+</div>
+
+{% if not profile.can_receive_requests %}
+  <div class="alert alert-warning mb-4">
+    <span class="alert__icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
+    <div>
+      You are not currently receiving new requests.
+      {% if not profile.has_location %}Pin your location{% elif not profile.is_eligible %}{{ profile.eligibility.summary }}{% else %}Check your availability setting{% endif %}.
+      <a href="{% url 'donor_profile' %}">Update your profile</a>.
+    </div>
+  </div>
+{% endif %}
+
+{% if pending %}
+  <div class="stack mb-5">
+    {% for invitation in pending %}
+      {% with req=invitation.blood_request %}
+      <article class="card {% if req.urgency == 'CRITICAL' %}card--accent{% endif %}">
+        <div class="card__body">
+          <div class="row-between row-wrap mb-4">
+            <div class="row row-wrap">
+              <span class="blood-badge blood-badge--lg">{{ req.blood_group }}</span>
+              <div>
+                <h3 class="mb-0">{{ req.patient_name }}
+                  {% if req.patient_age %}<span class="text-muted text-small">({{ req.patient_age }} yrs)</span>{% endif %}
+                </h3>
+                <div class="text-small text-muted">
+                  {{ req.units_required }} unit(s) needed by {{ req.needed_by|date:"d M, H:i" }}
+                  &middot; {{ req.requester_name }}
+                </div>
+              </div>
+            </div>
+            <span class="urgency urgency--{{ req.urgency }}">{{ req.get_urgency_display }}</span>
+          </div>
+
+          <div class="row row-wrap mb-4">
+            <span class="badge badge--blue">
+              <i class="fa-solid fa-location-dot" aria-hidden="true"></i> {{ invitation.distance_display }} away
+            </span>
+            <span class="badge">
+              <i class="fa-solid fa-hospital" aria-hidden="true"></i>
+              {{ req.hospital_name|default:req.location_display|truncatechars:36 }}
+            </span>
+            {% if invitation.expires_at %}
+              <span class="badge badge--amber">
+                <i class="fa-solid fa-hourglass-half" aria-hidden="true"></i>
+                Expires {{ invitation.expires_at|naturaltime }}
+              </span>
+            {% endif %}
+          </div>
+
+          {% if req.reason %}
+            <p class="text-muted text-small"><strong>Reason:</strong> {{ req.reason }}</p>
+          {% endif %}
+          {% if invitation.message %}
+            <blockquote class="text-muted text-small"
+                        style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--red-300);">
+              &ldquo;{{ invitation.message }}&rdquo;
+            </blockquote>
+          {% endif %}
+          {% if req.notes_for_donor %}
+            <p class="text-small"><strong>Note for you:</strong> {{ req.notes_for_donor }}</p>
+          {% endif %}
+
+          <div class="divider"></div>
+
+          <div class="row row-wrap">
+            <form method="post" action="{% url 'respond_invitation' invitation.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="accept">
+              <button class="btn btn-success" type="submit">
+                <i class="fa-solid fa-check" aria-hidden="true"></i> Accept and donate
+              </button>
+            </form>
+
+            <details style="flex:1; min-width:240px;">
+              <summary class="btn btn-secondary" style="display:inline-flex;">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i> Decline
+              </summary>
+              <form method="post" action="{% url 'respond_invitation' invitation.pk %}" class="stack mt-4">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="decline">
+                <div class="field">
+                  <label class="field__label" for="reason-{{ invitation.pk }}">Reason (optional)</label>
+                  <select class="field-select" name="decline_reason" id="reason-{{ invitation.pk }}">
+                    {% for value, label in response_form.fields.decline_reason.choices %}
+                      <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <button class="btn btn-danger" type="submit">Confirm decline</button>
+              </form>
+            </details>
+
+            <a class="btn btn-ghost ml-auto" href="{% url 'request_detail' req.pk %}">
+              <i class="fa-solid fa-circle-info" aria-hidden="true"></i> Full details
+            </a>
+          </div>
+        </div>
+      </article>
+      {% endwith %}
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card mb-5">
+    <div class="empty">
+      <div class="empty__icon"><i class="fa-solid fa-inbox" aria-hidden="true"></i></div>
+      <h3>Your inbox is empty</h3>
+      <p>
+        {% if profile.can_receive_requests %}
+          You are live on the map. We will notify you the moment a nearby patient needs your blood group.
+        {% else %}
+          Complete your profile and set yourself available to start receiving requests.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+{% endif %}
+
+{% if answered %}
+  <div class="card">
+    <div class="card__header"><h2>Previously answered</h2></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Patient</th><th>Group</th><th>Your answer</th><th>Distance</th><th>When</th></tr></thead>
+        <tbody>
+          {% for item in answered %}
+            <tr>
+              <td>{{ item.blood_request.patient_name }}</td>
+              <td><span class="blood-badge">{{ item.blood_request.blood_group }}</span></td>
+              <td><span class="status status--{{ item.status }}">{{ item.get_status_display }}</span></td>
+              <td>{{ item.distance_display }}</td>
+              <td class="text-muted">{{ item.responded_at|naturaltime|default:item.created_at|naturaltime }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

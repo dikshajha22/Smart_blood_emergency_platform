@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My donor profile - LifeLink{% endblock %}
+{% block map_assets %}{% include "partials/map_assets.html" %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Your donor profile</h1>
+    <p>The richer and more accurate this is, the better you rank for patients who need you.</p>
+  </div>
+  <div class="badge {% if profile.is_complete %}badge--green{% else %}badge--amber{% endif %}">
+    {{ profile.completion_percent }}% complete
+  </div>
+</div>
+
+{% if form.non_field_errors %}
+  <div class="alert alert-error mb-4">
+    <span class="alert__icon"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i></span>
+    <div>{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>
+  </div>
+{% endif %}
+
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  <div class="grid grid-sidebar">
+    <div class="stack">
+      <div class="card">
+        <div class="card__header">
+          <h2><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Pin your location</h2>
+          <span class="badge badge--red">Required</span>
+        </div>
+        <div class="card__body">
+          {% include "partials/map_picker.html" %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__header">
+          <h2><i class="fa-solid fa-droplet" aria-hidden="true"></i> Medical details</h2>
+        </div>
+        <div class="card__body">
+          <div class="form-grid">
+            {% include "partials/field.html" with field=form.blood_group %}
+            {% include "partials/field.html" with field=form.gender %}
+            {% include "partials/field.html" with field=form.date_of_birth %}
+            {% include "partials/field.html" with field=form.weight_kg %}
+            {% include "partials/field.html" with field=form.height_cm %}
+            {% include "partials/field.html" with field=form.last_donation_date %}
+            {% include "partials/field.html" with field=form.bio wrapper_class="span-2" %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__header">
+          <h2><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Address</h2>
+        </div>
+        <div class="card__body">
+          <div class="form-grid">
+            {% include "partials/field.html" with field=form.address wrapper_class="span-2" %}
+            {% include "partials/field.html" with field=form.city %}
+            {% include "partials/field.html" with field=form.state %}
+            {% include "partials/field.html" with field=form.postal_code %}
+            {% include "partials/field.html" with field=form.country %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__header">
+          <h2><i class="fa-solid fa-clipboard-question" aria-hidden="true"></i> Health declarations</h2>
+        </div>
+        <div class="card__body">
+          <p class="text-muted text-small">
+            These affect your eligibility. Answer honestly - it protects both you and the patient.
+          </p>
+          <div class="form-grid">
+            {% include "partials/field.html" with field=form.has_chronic_illness %}
+            {% include "partials/field.html" with field=form.on_medication %}
+            {% include "partials/field.html" with field=form.recently_tattooed %}
+            {% include "partials/field.html" with field=form.is_pregnant %}
+            {% include "partials/field.html" with field=form.is_smoker %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card__header"><h3>Availability</h3></div>
+        <div class="card__body stack">
+          {% include "partials/field.html" with field=form.availability_status %}
+          {% include "partials/field.html" with field=form.max_travel_km %}
+          {% include "partials/field.html" with field=form.available_from_hour %}
+          {% include "partials/field.html" with field=form.available_to_hour %}
+          {% include "partials/field.html" with field=form.is_searchable %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__header"><h3>Eligibility right now</h3></div>
+        <div class="card__body">
+          {% if eligibility.is_eligible %}
+            <div class="alert alert-success mb-0">
+              <span class="alert__icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+              <span>You are eligible to donate.</span>
+            </div>
+          {% else %}
+            <div class="alert alert-warning mb-0" style="flex-direction:column; align-items:flex-start;">
+              <strong>Currently not eligible</strong>
+              <ul style="margin:6px 0 0; padding-left:18px;">
+                {% for reason in eligibility.reasons %}<li class="text-small">{{ reason }}</li>{% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__body">
+          <button class="btn btn-primary btn-block btn-lg" type="submit">
+            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save profile
+          </button>
+          <a class="btn btn-ghost btn-block mt-4" href="{% url 'donor_dashboard' %}">Cancel</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Wait for the deferred Leaflet + picker bundles before initialising.
+  window.addEventListener("load", function () {
+    new LocationPicker({
+      mapId: "location-map",
+      config: JSON.parse(document.getElementById("map-config").textContent),
+    });
+  });
+</script>
+{% endblock %}

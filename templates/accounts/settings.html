@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load ui %}
+
+{% block title %}Account settings - LifeLink{% endblock %}
+{% block container_class %}container container-narrow{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Account settings</h1>
+    <p>Your name, contact details and photo.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card__body">
+    <div class="row mb-5">
+      <span class="avatar avatar-lg">
+        {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user|initials }}{% endif %}
+      </span>
+      <div>
+        <strong>{{ user.display_name }}</strong>
+        <div class="text-small text-muted">{{ user.get_role_display }} &middot; joined {{ user.date_joined|date:"F Y" }}</div>
+      </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      <div class="form-grid">
+        {% include "partials/field.html" with field=form.first_name %}
+        {% include "partials/field.html" with field=form.last_name %}
+        {% include "partials/field.html" with field=form.email %}
+        {% include "partials/field.html" with field=form.phone %}
+        {% include "partials/field.html" with field=form.avatar wrapper_class="span-2" %}
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">
+          <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save changes
+        </button>
+        <a class="btn btn-ghost" href="{% url 'dashboard' %}">Back to dashboard</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card mt-4">
+  <div class="card__header"><h3>Your role</h3></div>
+  <div class="card__body">
+    <p class="text-muted mb-0">
+      You are registered as a <strong>{{ user.get_role_display }}</strong>.
+      {% if is_donor %}
+        Your medical and location details live on your
+        <a href="{% url 'donor_profile' %}">donor profile</a>.
+      {% elif is_recipient %}
+        Your medical and location details live on your
+        <a href="{% url 'recipient_profile' %}">recipient profile</a>.
+      {% elif is_hospital %}
+        Your facility details live on your
+        <a href="{% url 'hospital_profile' %}">hospital profile</a>.
+      {% endif %}
+      Changing your role requires a new account, so history stays consistent.
+    </p>
+  </div>
+</div>
+{% endblock %}

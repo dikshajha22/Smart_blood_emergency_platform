@@ -1,0 +1,39 @@
+{% comment %}
+Map pin-point picker. Expects `map_config` (a JSON string) in context and the
+form to expose hidden latitude/longitude/location_label fields.
+{% endcomment %}
+<div class="stack">
+  <div class="map-hint">
+    <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+    <span>Click the map to drop your pin, or drag it to fine-tune. Distance matching depends on this.</span>
+  </div>
+
+  <div class="row row-wrap">
+    <input type="text" id="geocode-input" class="field-input" style="flex:1; min-width:200px;"
+           placeholder="Search a place, e.g. Dhaka Medical College"
+           aria-label="Search for a place">
+    <button type="button" class="btn btn-secondary" id="geocode-btn">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Search
+    </button>
+    <button type="button" class="btn btn-secondary" id="locate-me">
+      <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Use my location
+    </button>
+  </div>
+
+  <div id="map-message" class="alert alert-warning" hidden></div>
+
+  <div id="location-map" class="map-canvas map-canvas--short"></div>
+
+  <div class="row text-small text-muted">
+    <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
+    <span>Pinned coordinate:&nbsp;</span>
+    <strong id="location-readout" class="mono">{% if profile.has_location %}{{ profile.latitude|floatformat:5 }}, {{ profile.longitude|floatformat:5 }}{% else %}not set yet{% endif %}</strong>
+  </div>
+
+  {# Hidden inputs are the source of truth and are validated server-side. #}
+  {{ form.latitude }}
+  {{ form.longitude }}
+  {{ form.location_label }}
+</div>
+
+{{ map_config|json_script:"map-config" }}

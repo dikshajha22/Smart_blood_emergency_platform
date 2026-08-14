@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}How the AI ranking works - LifeLink{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>The donor ranking model</h1>
+    <p>Every match score is explainable. Here is exactly what the model weighs and how well it performs.</p>
+  </div>
+  <span class="badge {% if ranker.is_trained %}badge--green{% else %}badge--amber{% endif %}">
+    {{ ranker.source }}
+  </span>
+</div>
+
+<div class="grid grid-3 mb-5">
+  <div class="stat stat--blue">
+    <span class="stat__label">Model state</span>
+    <span class="stat__value" style="font-size:1.2rem;">
+      {% if ranker.is_trained %}Learned{% else %}Domain prior{% endif %}
+    </span>
+    <span class="stat__hint">
+      {% if ranker.is_trained %}Version {{ ranker.version }}{% else %}Awaiting enough labelled responses{% endif %}
+    </span>
+  </div>
+  <div class="stat stat--green">
+    <span class="stat__label">Labelled responses</span>
+    <span class="stat__value">{{ labelled_samples|intcomma }}</span>
+    <span class="stat__hint">Accept/decline outcomes available for training</span>
+  </div>
+  <div class="stat stat--amber">
+    <span class="stat__label">Holdout accuracy</span>
+    <span class="stat__value">
+      {% if history.0.accuracy %}{{ history.0.accuracy|floatformat:2 }}{% else %}--{% endif %}
+    </span>
+    <span class="stat__hint">
+      {% if history.0.auc %}AUC {{ history.0.auc|floatformat:3 }}{% else %}No trained version yet{% endif %}
+    </span>
+  </div>
+</div>
+
+<div class="grid grid-sidebar">
+  <div class="card">
+    <div class="card__header">
+      <h2><i class="fa-solid fa-sliders" aria-hidden="true"></i> Feature weights</h2>
+      <span class="text-small text-muted">Ordered by influence</span>
+    </div>
+    <div class="card__body stack">
+      <p class="text-muted text-small">
+        The model is a logistic regression predicting <em>P(donor accepts)</em>. A positive
+        weight pushes a donor up the ranking; a negative weight pushes them down.
+      </p>
+
+      {% for row in feature_rows %}
+        <div class="weight-bar">
+          <span style="min-width:210px; font-size:0.87rem;">
+            {{ row.label }}
+            {% if not row.is_positive %}
+              <i class="fa-solid fa-arrow-down" style="color:var(--red-500);" title="Reduces the score" aria-hidden="true"></i>
+            {% endif %}
+          </span>
+          <span class="weight-bar__track">
+            <span class="weight-bar__fill {% if not row.is_positive %}weight-bar__fill--negative{% endif %}"
+                  style="width: {{ row.magnitude_percent }}%;"></span>
+          </span>
+          <span class="weight-bar__value">{{ row.weight|floatformat:3 }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card__header"><h3>How it learns</h3></div>
+      <div class="card__body">
+        <ol class="stack text-small" style="padding-left:18px; margin:0;">
+          <li>Every invitation records the 14-feature vector used to score that donor.</li>
+          <li>When the donor accepts or declines, that becomes a labelled example.</li>
+          <li>Once enough new labels accumulate, weights are refit by gradient descent
+              with L2 regularisation, starting from the expert prior.</li>
+          <li>The new version is evaluated on a 25% holdout and published only if training succeeds.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__header"><h3>Version history</h3></div>
+      {% if history %}
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Ver</th><th>Samples</th><th>Acc</th><th>AUC</th><th>Trained</th></tr></thead>
+            <tbody>
+              {% for model in history %}
+                <tr>
+                  <td>
+                    v{{ model.version }}
+                    {% if model.is_active %}<span class="badge badge--green">live</span>{% endif %}
+                  </td>
+                  <td>{{ model.training_samples }}</td>
+                  <td>{% if model.accuracy %}{{ model.accuracy|floatformat:2 }}{% else %}--{% endif %}</td>
+                  <td>{% if model.auc %}{{ model.auc|floatformat:3 }}{% else %}--{% endif %}</td>
+                  <td class="text-muted">{{ model.trained_at|naturaltime }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card__body">
+          <p class="text-muted text-small mb-0">
+            No trained version yet. The system is using its hand-tuned domain prior, which
+            already encodes transfusion best practice: proximity and proven responsiveness
+            dominate, and a history of missed donations is penalised heavily.
+          </p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card__header"><h3>Fairness note</h3></div>
+      <div class="card__body">
+        <p class="text-muted text-small mb-0">
+          The model deliberately uses no demographic attribute beyond what is medically
+          required (blood group, age and weight eligibility). It never sees name,
+          gender, religion or ethnicity, so it cannot rank on them.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

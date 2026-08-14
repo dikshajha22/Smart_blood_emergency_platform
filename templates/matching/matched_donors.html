@@ -1,0 +1,273 @@
+{% extends 'base.html' %}
+{% load static ui %}
+
+{% block title %}Matched donors for {{ blood_request.patient_name }} - LifeLink{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block map_assets %}{% include "partials/map_assets.html" %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Matched donors</h1>
+    <p>
+      For <strong>{{ blood_request.patient_name }}</strong> &middot;
+      <span class="blood-badge">{{ blood_request.blood_group }}</span>
+      <span class="urgency urgency--{{ blood_request.urgency }}">{{ blood_request.get_urgency_display }}</span>
+      &middot; {{ blood_request.units_outstanding }} unit(s) still needed
+      &middot; within {{ blood_request.effective_radius_km|floatformat:0 }} km
+    </p>
+  </div>
+  <div class="btn-group">
+    <a class="btn btn-secondary" href="{% url 'request_detail' blood_request.pk %}">
+      <i class="fa-solid fa-file-medical" aria-hidden="true"></i> Request details
+    </a>
+    <form method="post" action="{% url 'auto_invite' blood_request.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="count" value="5">
+      <button class="btn btn-primary" type="submit">
+        <i class="fa-solid fa-bolt" aria-hidden="true"></i> Auto-invite top 5
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="alert alert-info mb-4">
+  <span class="alert__icon"><i class="fa-solid fa-brain" aria-hidden="true"></i></span>
+  <div>
+    Ranked by <strong>{{ ranker.source }}</strong>. The score predicts how likely each donor
+    is to accept and actually donate &mdash; not just how close they are.
+    <a href="{% url 'model_insights' %}">See what the model weighs</a>.
+    {% if already_invited %}
+      You have already invited {{ already_invited }} of a maximum {{ invite_limit }} donors for this request.
+    {% endif %}
+  </div>
+</div>
+
+<form method="post" action="{% url 'invite_donors' blood_request.pk %}" id="invite-form">
+  {% csrf_token %}
+
+  <div class="map-shell">
+    <aside class="map-panel">
+      <div class="map-panel__header row-between">
+        <h2 style="margin:0; font-size:1.05rem;">
+          <span id="result-count">{{ scored_donors|length }}</span> candidate(s)
+        </h2>
+        <button class="btn btn-ghost btn-sm" id="select-top" data-count="5" type="button">
+          <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Top 5
+        </button>
+      </div>
+
+      <div class="map-panel__results" id="donor-results">
+        {% for scored in scored_donors %}
+          <article class="donor-card" data-donor-id="{{ scored.donor.pk }}">
+            <div class="donor-card__top">
+              <div class="score score--{{ scored.tier }}" style="--pct: {{ scored.score_percent }};"
+                   title="AI predicted willingness to donate">
+                <span>{{ scored.score_percent }}%</span>
+              </div>
+
+              <div class="donor-card__identity">
+                <div class="row row-wrap">
+                  <p class="donor-card__name">{{ scored.donor.user.display_name }}</p>
+                  <span class="blood-badge">{{ scored.donor.blood_group }}</span>
+                  {% if scored.donor.is_verified %}
+                    <span class="badge badge--blue"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Verified</span>
+                  {% endif %}
+                  <span class="badge badge--muted">#{{ scored.rank }}</span>
+                </div>
+                <div class="donor-card__meta">
+                  {{ scored.distance_display }} away &middot; {{ scored.donor.location_display|truncatechars:30 }}
+                </div>
+              </div>
+            </div>
+
+            {% if scored.reasons %}
+              <div class="reasons">
+                {% for reason in scored.reasons %}
+                  <span class="reason {% if 'Caution' in reason %}reason--caution{% endif %}">{{ reason }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="donor-card__stats">
+              <span class="donor-card__stat">
+                <i class="fa-solid fa-droplet" aria-hidden="true"></i> {{ scored.donor.total_donations }} donation{{ scored.donor.total_donations|pluralize }}
+              </span>
+              <span class="donor-card__stat">
+                <i class="fa-solid fa-shield-heart" aria-hidden="true"></i> {{ scored.donor.reliability_percent }}% reliable
+              </span>
+              {% if scored.donor.avg_response_minutes %}
+                <span class="donor-card__stat">
+                  <i class="fa-solid fa-clock" aria-hidden="true"></i> replies ~{{ scored.donor.avg_response_minutes|floatformat:0 }} min
+                </span>
+              {% endif %}
+              {% if scored.donor.age %}
+                <span class="donor-card__stat">
+                  <i class="fa-solid fa-user" aria-hidden="true"></i> {{ scored.donor.age }} yrs
+                </span>
+              {% endif %}
+            </div>
+
+            <div class="donor-card__footer">
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+                <input type="checkbox" class="field-checkbox donor-checkbox"
+                       value="{{ scored.donor.pk }}" style="margin-right:6px;">
+                Select
+              </label>
+              <a class="btn btn-ghost btn-sm" href="{% url 'donor_detail' scored.donor.pk %}">Profile</a>
+              <button class="btn btn-ghost btn-sm ml-auto focus-donor" type="button"
+                      data-donor-id="{{ scored.donor.pk }}"
+                      data-lat="{{ scored.donor.latitude }}" data-lng="{{ scored.donor.longitude }}"
+                      title="Show on map">
+                <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
+              </button>
+            </div>
+          </article>
+        {% empty %}
+          <div class="empty">
+            <div class="empty__icon"><i class="fa-solid fa-user-slash" aria-hidden="true"></i></div>
+            <h3>No eligible donors found</h3>
+            <p>
+              Nobody compatible, available and eligible is within
+              {{ blood_request.effective_radius_km|floatformat:0 }} km.
+              Try increasing the search radius on the request.
+            </p>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="map-panel__footer">
+        <div id="selection-bar" hidden>
+          <div class="row-between mb-4">
+            <strong><span id="selected-count">0</span> selected</strong>
+            <button class="btn btn-ghost btn-sm" type="button" id="clear-selection">Clear</button>
+          </div>
+          <div class="field mb-4">
+            {{ invite_form.message }}
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">
+            <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Send request to selected
+          </button>
+        </div>
+        <input type="hidden" name="donor_ids" id="id_donor_ids">
+      </div>
+    </aside>
+
+    <div id="map" role="application" aria-label="Map of matched donors"></div>
+  </div>
+</form>
+
+{{ map_config|json_script:"map-config" }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  /**
+   * This page renders its ranked list server-side (so it works without JS and is
+   * indexable/printable). The script only adds the map layer and the selection
+   * behaviour on top.
+   */
+  window.addEventListener("load", function () {
+    var config = JSON.parse(document.getElementById("map-config").textContent);
+    var mapEl = document.getElementById("map");
+    if (!mapEl || typeof L === "undefined") return;
+
+    var map = L.map(mapEl).setView([config.center.lat, config.center.lng], config.center.zoom);
+    L.tileLayer(window.MAP_TILE_URL, {
+      attribution: window.MAP_TILE_ATTRIBUTION, maxZoom: 19,
+    }).addTo(map);
+
+    L.marker([config.center.lat, config.center.lng], {
+      icon: window.buildMapPin("pin--request"),
+    }).addTo(map).bindPopup("Patient location");
+
+    L.circle([config.center.lat, config.center.lng], {
+      radius: config.radiusKm * 1000,
+      color: "#e11d48", weight: 1.5, opacity: 0.6,
+      fillColor: "#e11d48", fillOpacity: 0.05,
+    }).addTo(map);
+
+    // Build markers from the rendered cards, keeping one source of truth.
+    var markers = {};
+    document.querySelectorAll(".donor-card").forEach(function (card) {
+      var focus = card.querySelector(".focus-donor");
+      if (!focus) return;
+      var lat = parseFloat(focus.dataset.lat);
+      var lng = parseFloat(focus.dataset.lng);
+      if (isNaN(lat) || isNaN(lng)) return;
+
+      var score = card.querySelector(".score");
+      var tier = "low";
+      if (score) {
+        ["excellent", "good", "fair", "low"].forEach(function (name) {
+          if (score.classList.contains("score--" + name)) tier = name;
+        });
+      }
+      var label = score ? score.textContent.trim() : "";
+      var name = card.querySelector(".donor-card__name").textContent;
+
+      var marker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: "",
+          html: '<div class="pin pin--' + tier + '"><span>' + label + "</span></div>",
+          iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -34],
+        }),
+        title: name,
+      }).addTo(map);
+
+      marker.bindPopup(name + "<br>" + card.querySelector(".donor-card__meta").textContent.trim());
+      markers[focus.dataset.donorId] = marker;
+
+      focus.addEventListener("click", function () {
+        map.setView([lat, lng], Math.max(map.getZoom(), 14));
+        marker.openPopup();
+      });
+    });
+
+    // Selection -> hidden donor_ids field consumed by InviteDonorsForm.
+    var hidden = document.getElementById("id_donor_ids");
+    var bar = document.getElementById("selection-bar");
+    var countEl = document.getElementById("selected-count");
+    var boxes = document.querySelectorAll(".donor-checkbox");
+
+    function sync() {
+      var ids = [];
+      boxes.forEach(function (box) {
+        var card = box.closest(".donor-card");
+        if (box.checked) {
+          ids.push(box.value);
+          card.classList.add("is-selected");
+        } else {
+          card.classList.remove("is-selected");
+        }
+      });
+      hidden.value = ids.join(",");
+      countEl.textContent = ids.length;
+      bar.hidden = ids.length === 0;
+    }
+
+    boxes.forEach(function (box) { box.addEventListener("change", sync); });
+
+    var selectTop = document.getElementById("select-top");
+    if (selectTop) {
+      selectTop.addEventListener("click", function () {
+        var limit = parseInt(selectTop.dataset.count, 10);
+        Array.prototype.slice.call(boxes, 0, limit).forEach(function (box) {
+          box.checked = true;
+        });
+        sync();
+      });
+    }
+
+    var clear = document.getElementById("clear-selection");
+    if (clear) {
+      clear.addEventListener("click", function () {
+        boxes.forEach(function (box) { box.checked = false; });
+        sync();
+      });
+    }
+
+    setTimeout(function () { map.invalidateSize(); }, 200);
+  });
+</script>
+{% endblock %}

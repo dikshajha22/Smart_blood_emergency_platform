@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Find donors near you - LifeLink{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block map_assets %}{% include "partials/map_assets.html" %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Find donors</h1>
+    <p id="search-status" class="text-muted">Loading nearby donors...</p>
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-secondary" id="locate-search" type="button">
+      <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Search from my location
+    </button>
+    <button class="btn btn-secondary" id="refresh-btn" type="button">
+      <i class="fa-solid fa-rotate" aria-hidden="true"></i> Refresh
+    </button>
+    <a class="btn btn-primary" href="{% url 'create_request' %}">
+      <i class="fa-solid fa-plus" aria-hidden="true"></i> New request
+    </a>
+  </div>
+</div>
+
+{% if not profile.has_location %}
+  <div class="alert alert-warning mb-4">
+    <span class="alert__icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
+    <div>
+      You have not pinned your own location yet, so this search starts from a default point.
+      <a href="{% if is_recipient %}{% url 'recipient_profile' %}{% else %}{% url 'hospital_profile' %}{% endif %}">Set your location</a>
+      for accurate distances.
+    </div>
+  </div>
+{% endif %}
+
+<div class="map-shell">
+  <aside class="map-panel">
+    <div class="map-panel__header">
+      <div class="row-between">
+        <h2 style="margin:0; font-size:1.05rem;">
+          <span id="result-count">0</span> donor(s)
+        </h2>
+        <button class="btn btn-ghost btn-sm" id="select-top" data-count="5" type="button"
+                title="Select the five best-ranked donors">
+          <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Top 5
+        </button>
+      </div>
+      {% if active_request %}
+        <p class="text-small text-muted mb-0">
+          Ranking for <strong>{{ active_request.patient_name }}</strong>
+          ({{ active_request.blood_group }}, {{ active_request.units_outstanding }} unit(s) still needed)
+        </p>
+      {% endif %}
+    </div>
+
+    <div class="map-panel__filters">
+      <div class="field">
+        <label class="field__label" for="blood-group-input">Blood group needed</label>
+        <select class="field-select" id="blood-group-input">
+          <option value="">Any compatible group</option>
+          {% for value, label in blood_groups %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="radius-input">Search radius</label>
+        <div class="range-row">
+          <input type="range" id="radius-input" min="1" max="{{ MAX_SEARCH_RADIUS_KM|floatformat:0 }}"
+                 step="1" value="{{ DEFAULT_SEARCH_RADIUS_KM|floatformat:0 }}">
+          <output id="radius-output">{{ DEFAULT_SEARCH_RADIUS_KM|floatformat:0 }} km</output>
+        </div>
+      </div>
+
+      <label class="field-check">
+        <input type="checkbox" class="field-checkbox" id="available-input" checked>
+        <span class="field-check__text">
+          <span class="field-check__label">Available donors only</span>
+        </span>
+      </label>
+
+      <label class="field-check">
+        <input type="checkbox" class="field-checkbox" id="verified-input">
+        <span class="field-check__text">
+          <span class="field-check__label">Verified donors only</span>
+        </span>
+      </label>
+
+      <label class="field-check">
+        <input type="checkbox" class="field-checkbox" id="exact-input">
+        <span class="field-check__text">
+          <span class="field-check__label">Exact blood group only</span>
+          <span class="field__help">Off means all transfusion-safe groups.</span>
+        </span>
+      </label>
+    </div>
+
+    <div class="map-panel__results" id="donor-results">
+      <div class="empty">
+        <div class="spinner"></div>
+        <p>Searching...</p>
+      </div>
+    </div>
+
+    <div class="map-panel__footer">
+      <div class="map-legend">
+        <span class="map-legend__item"><span class="map-legend__swatch" style="background: var(--green-500);"></span> Excellent match</span>
+        <span class="map-legend__item"><span class="map-legend__swatch" style="background: var(--blue-500);"></span> Good</span>
+        <span class="map-legend__item"><span class="map-legend__swatch" style="background: var(--amber-500);"></span> Fair</span>
+        <span class="map-legend__item"><span class="map-legend__swatch" style="background: var(--ink-500);"></span> Low</span>
+      </div>
+      <p class="text-small text-muted mb-0 mt-4">
+        <i class="fa-solid fa-brain" aria-hidden="true"></i> Scored by {{ ranker.source }}.
+        <a href="{% url 'model_insights' %}">How it works</a>
+      </p>
+    </div>
+  </aside>
+
+  <div>
+    <div id="map" role="application" aria-label="Map of nearby blood donors"></div>
+
+    {% if open_requests %}
+      <form method="post" id="invite-form" class="card mt-4"
+            action="{% url 'invite_donors' open_requests.0.pk %}">
+        {% csrf_token %}
+        <div class="card__body" id="selection-bar" hidden>
+          <div class="row-between row-wrap mb-4">
+            <div>
+              <strong><span id="selected-count">0</span> donor(s) selected</strong>
+              <p class="text-small text-muted mb-0">
+                They will receive this request in their inbox and can accept or decline.
+              </p>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-ghost" type="button" id="clear-selection">Clear</button>
+              <button class="btn btn-primary" type="submit">
+                <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Send request
+              </button>
+            </div>
+          </div>
+
+          <input type="hidden" name="donor_ids" id="id_donor_ids">
+
+          <div class="form-grid">
+            <div class="field">
+              <label class="field__label" for="target-request">Send for which request?</label>
+              {# Switching this rewrites the form action, so the invitation is
+                 always attached to the request the user actually picked. #}
+              <select class="field-select" id="target-request">
+                {% for req in open_requests %}
+                  <option value="{% url 'invite_donors' req.pk %}"
+                          {% if active_request and active_request.pk == req.pk %}selected{% endif %}>
+                    {{ req.patient_name }} &mdash; {{ req.blood_group }},
+                    {{ req.units_outstanding }} unit(s) needed
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label class="field__label" for="id_message">Message (optional)</label>
+              <textarea class="field-textarea" name="message" id="id_message" rows="2"
+                        placeholder="Add a short personal note for the donors"></textarea>
+            </div>
+          </div>
+        </div>
+      </form>
+    {% else %}
+      <div class="card mt-4">
+        <div class="card__body row-between row-wrap">
+          <div>
+            <strong>No open request yet</strong>
+            <p class="text-small text-muted mb-0">
+              Create a blood request first, then you can send it to the donors you pick here.
+            </p>
+          </div>
+          <a class="btn btn-primary" href="{% url 'create_request' %}">Create a request</a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{{ map_config|json_script:"map-config" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/donor-map.js' %}" defer></script>
+<script>
+  window.addEventListener("load", function () {
+    var config = JSON.parse(document.getElementById("map-config").textContent);
+    var initialGroup = document.getElementById("blood-group-input");
+    if (initialGroup && config.bloodGroup) initialGroup.value = config.bloodGroup;
+
+    var radius = document.getElementById("radius-input");
+    var radiusOut = document.getElementById("radius-output");
+    if (radius && config.radiusKm) {
+      radius.value = config.radiusKm;
+      if (radiusOut) radiusOut.textContent = config.radiusKm + " km";
+    }
+
+    new DonorMap(config);
+
+    // Keep the form action in step with the chosen target request.
+    var target = document.getElementById("target-request");
+    var form = document.getElementById("invite-form");
+    if (target && form) {
+      var sync = function () { form.action = target.value; };
+      sync();
+      target.addEventListener("change", sync);
+    }
+  });
+</script>
+{% endblock %}

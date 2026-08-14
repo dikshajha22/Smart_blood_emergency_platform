@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% load ui humanize %}
+
+{% block title %}Donor dashboard - LifeLink{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>Hello, {{ user.first_name|default:user.username }}</h1>
+    <p>
+      {% if profile.is_eligible %}
+        You are eligible to donate and visible to nearby patients.
+      {% else %}
+        {{ eligibility.summary }}
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="btn-group">
+    <form method="post" action="{% url 'toggle_availability' %}">
+      {% csrf_token %}
+      {% if profile.availability_status == 'AVAILABLE' %}
+        <input type="hidden" name="status" value="PAUSED">
+        <button class="btn btn-secondary" type="submit">
+          <i class="fa-solid fa-pause" aria-hidden="true"></i> Pause requests
+        </button>
+      {% else %}
+        <input type="hidden" name="status" value="AVAILABLE">
+        <button class="btn btn-success" type="submit">
+          <i class="fa-solid fa-play" aria-hidden="true"></i> Go available
+        </button>
+      {% endif %}
+    </form>
+    <a class="btn btn-primary" href="{% url 'donor_profile' %}">
+      <i class="fa-solid fa-user-pen" aria-hidden="true"></i> Edit profile
+    </a>
+  </div>
+</div>
+
+{% if not profile.is_complete %}
+  <div class="card card--accent mb-4">
+    <div class="card__body">
+      <div class="row-between row-wrap">
+        <div>
+          <h3 class="mb-0"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Your profile is {{ profile.completion_percent }}% complete</h3>
+          <p class="text-muted mb-0">
+            Still needed: {{ profile.missing_fields|join:", " }}.
+            {% if not profile.has_location %}<strong>Without a map pin you cannot be found by distance.</strong>{% endif %}
+          </p>
+        </div>
+        <a class="btn btn-primary" href="{% url 'donor_profile' %}">Complete profile</a>
+      </div>
+      <div class="progress progress--lg mt-4">
+        <div class="progress__bar" style="width: {{ profile.completion_percent }}%;"></div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<div class="grid grid-4 mb-5">
+  <div class="stat stat--red">
+    <span class="stat__icon"><i class="fa-solid fa-droplet" aria-hidden="true"></i></span>
+    <span class="stat__label">Blood group</span>
+    <span class="stat__value">{{ profile.blood_group|default:"--" }}</span>
+    <span class="stat__hint">Can help {{ profile.versatility|percentage }} of patients</span>
+  </div>
+  <div class="stat stat--green">
+    <span class="stat__icon"><i class="fa-solid fa-heart-pulse" aria-hidden="true"></i></span>
+    <span class="stat__label">Donations</span>
+    <span class="stat__value">{{ stats.total_donations }}</span>
+    <span class="stat__hint">Up to {{ stats.lives_touched }} lives helped</span>
+  </div>
+  <div class="stat stat--blue">
+    <span class="stat__icon"><i class="fa-solid fa-shield-heart" aria-hidden="true"></i></span>
+    <span class="stat__label">Reliability</span>
+    <span class="stat__value">{{ stats.reliability_percent }}%</span>
+    <span class="stat__hint">
+      {% if stats.avg_response %}Replies in ~{{ stats.avg_response|floatformat:0 }} min{% else %}No responses yet{% endif %}
+    </span>
+  </div>
+  <div class="stat stat--amber">
+    <span class="stat__icon"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span>
+    <span class="stat__label">Next eligible</span>
+    <span class="stat__value" style="font-size:1.2rem;">
+      {% if profile.is_eligible %}Now{% elif profile.next_eligible_on %}{{ profile.next_eligible_on|date:"d M Y" }}{% else %}--{% endif %}
+    </span>
+    <span class="stat__hint">
+      {% if profile.days_until_eligible %}{{ profile.days_until_eligible }} day(s) to rest{% else %}Ready to donate{% endif %}
+    </span>
+  </div>
+</div>
+
+<div class="grid grid-sidebar">
+  <div class="stack">
+    <div class="card">
+      <div class="card__header">
+        <h2><i class="fa-solid fa-inbox" aria-hidden="true"></i> Requests for you
+          {% if pending_count %}<span class="badge badge--red">{{ pending_count }} waiting</span>{% endif %}
+        </h2>
+        <a class="btn btn-ghost btn-sm" href="{% url 'donor_inbox' %}">Open inbox</a>
+      </div>
+
+      {% if pending_invitations %}
+        <div class="list">
+          {% for invitation in pending_invitations|slice:":5" %}
+            <div class="list__item">
+              <span class="blood-badge">{{ invitation.blood_request.blood_group }}</span>
+              <div class="list__body">
+                <div class="list__title">{{ invitation.blood_request.patient_name }}</div>
+                <div class="list__meta">
+                  <span class="urgency urgency--{{ invitation.blood_request.urgency }}">{{ invitation.blood_request.get_urgency_display }}</span>
+                  &middot; {{ invitation.distance_display }} away
+                  &middot; needed by {{ invitation.blood_request.needed_by|date:"d M, H:i" }}
+                </div>
+              </div>
+              <a class="btn btn-primary btn-sm" href="{% url 'donor_inbox' %}">Respond</a>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty">
+          <div class="empty__icon"><i class="fa-solid fa-inbox" aria-hidden="true"></i></div>
+          <h3>No open requests</h3>
+          <p>
+            {% if profile.can_receive_requests %}
+              You are visible on the map. We will notify you the moment a nearby patient needs your blood group.
+            {% else %}
+              You are not currently receiving requests. Check your availability and profile completeness.
+            {% endif %}
+          </p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card__header">
+        <h2><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Recent activity</h2>
+        <a class="btn btn-ghost btn-sm" href="{% url 'donation_history' %}">Full history</a>
+      </div>
+      {% if history %}
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>Patient</th><th>Group</th><th>Your answer</th><th>Match</th><th>When</th></tr>
+            </thead>
+            <tbody>
+              {% for item in history %}
+                <tr>
+                  <td>{{ item.blood_request.patient_name }}</td>
+                  <td><span class="blood-badge">{{ item.blood_request.blood_group }}</span></td>
+                  <td><span class="status status--{{ item.status }}">{{ item.get_status_display }}</span></td>
+                  <td>{{ item.score_percent }}%</td>
+                  <td class="text-muted">{{ item.created_at|naturaltime }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card__body text-muted">No responses yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card__header"><h3>Your availability</h3></div>
+      <div class="card__body stack">
+        <div class="row-between">
+          <span class="text-muted">Status</span>
+          <span class="badge {% if profile.availability_status == 'AVAILABLE' %}badge--green{% else %}badge--muted{% endif %}">
+            {{ profile.get_availability_status_display }}
+          </span>
+        </div>
+        <div class="row-between">
+          <span class="text-muted">Visible on map</span>
+          <span>{% if profile.is_searchable %}Yes{% else %}Hidden{% endif %}</span>
+        </div>
+        <div class="row-between">
+          <span class="text-muted">Contact hours</span>
+          <span>{{ profile.available_from_hour }}:00 - {{ profile.available_to_hour }}:00</span>
+        </div>
+        <div class="row-between">
+          <span class="text-muted">Travel limit</span>
+          <span>{{ profile.max_travel_km|floatformat:0 }} km</span>
+        </div>
+        <div class="row-between">
+          <span class="text-muted">Location</span>
+          <span class="text-right">{{ profile.location_display|truncatechars:28 }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__header"><h3>Eligibility check</h3></div>
+      <div class="card__body">
+        {% if eligibility.is_eligible %}
+          <div class="alert alert-success mb-0">
+            <span class="alert__icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+            <span>All checks passed. You can donate.</span>
+          </div>
+        {% else %}
+          <ul class="stack" style="margin:0; padding-left:18px;">
+            {% for reason in eligibility.reasons %}
+              <li class="text-small">{{ reason }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if donations %}
+      <div class="card">
+        <div class="card__header"><h3>Donation log</h3></div>
+        <div class="list">
+          {% for donation in donations %}
+            <div class="list__item">
+              <div class="list__body">
+                <div class="list__title">{{ donation.donated_on|date:"d M Y" }}</div>
+                <div class="list__meta">{{ donation.units }} unit(s)
+                  {% if donation.blood_request %}&middot; {{ donation.blood_request.patient_name }}{% endif %}
+                </div>
+              </div>
+              <i class="fa-solid fa-droplet" style="color: var(--red-500);" aria-hidden="true"></i>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

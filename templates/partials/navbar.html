@@ -1,0 +1,124 @@
+{% load ui %}
+<nav class="navbar">
+  <div class="container navbar__inner">
+    <a class="navbar__brand" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'home' %}{% endif %}">
+      <span class="navbar__brand-mark" aria-hidden="true"><i class="fa-solid fa-droplet"></i></span>
+      <span>LifeLink</span>
+    </a>
+
+    {% if user.is_authenticated %}
+      <div class="navbar__links" id="nav-links">
+        <a class="navbar__link {% if request.resolver_match.url_name == 'dashboard' or 'dashboard' in request.path %}is-active{% endif %}"
+           href="{% url 'dashboard' %}">
+          <i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Dashboard
+        </a>
+
+        {% if is_donor %}
+          <a class="navbar__link {% if request.resolver_match.url_name == 'donor_inbox' %}is-active{% endif %}"
+             href="{% url 'donor_inbox' %}">
+            <i class="fa-solid fa-inbox" aria-hidden="true"></i> Requests
+            {% if pending_invitations %}<span class="badge badge--red">{{ pending_invitations }}</span>{% endif %}
+          </a>
+          <a class="navbar__link" href="{% url 'donor_profile' %}">
+            <i class="fa-solid fa-id-card" aria-hidden="true"></i> My profile
+          </a>
+          <a class="navbar__link" href="{% url 'donation_history' %}">
+            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> History
+          </a>
+        {% endif %}
+
+        {% if is_recipient or is_hospital %}
+          <a class="navbar__link {% if request.resolver_match.url_name == 'donor_map' %}is-active{% endif %}"
+             href="{% url 'donor_map' %}">
+            <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Find donors
+          </a>
+          <a class="navbar__link {% if request.resolver_match.url_name == 'my_requests' %}is-active{% endif %}"
+             href="{% url 'my_requests' %}">
+            <i class="fa-solid fa-file-medical" aria-hidden="true"></i> My requests
+          </a>
+          <a class="navbar__link" href="{% url 'create_request' %}">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i> New request
+          </a>
+        {% endif %}
+
+        {% if is_hospital %}
+          <a class="navbar__link" href="{% url 'hospital_inventory' %}">
+            <i class="fa-solid fa-warehouse" aria-hidden="true"></i> Inventory
+          </a>
+        {% endif %}
+
+        <a class="navbar__link" href="{% url 'model_insights' %}" title="How the AI ranking works">
+          <i class="fa-solid fa-brain" aria-hidden="true"></i> AI model
+        </a>
+      </div>
+
+      <div class="navbar__actions">
+        <a class="bell" href="{% url 'notification_list' %}" aria-label="Notifications">
+          <i class="fa-solid fa-bell" aria-hidden="true"></i>
+          <span class="badge-dot" id="notif-badge"
+                data-url="{% url 'api_unread_notifications' %}"
+                {% if not unread_notifications %}hidden{% endif %}>{{ unread_notifications }}</span>
+        </a>
+
+        <div class="dropdown">
+          <button class="avatar" type="button" data-dropdown="user-menu"
+                  aria-expanded="false" aria-haspopup="true" aria-label="Account menu">
+            {% if user.avatar %}
+              <img src="{{ user.avatar.url }}" alt="">
+            {% else %}
+              {{ user|initials }}
+            {% endif %}
+          </button>
+
+          <div class="dropdown__panel" id="user-menu" hidden>
+            <div style="padding: 8px 12px;">
+              <div style="font-weight:700;">{{ user.display_name }}</div>
+              <div class="text-small text-muted">{{ user.get_role_display }}</div>
+            </div>
+            <div class="dropdown__divider"></div>
+            <a class="dropdown__item" href="{% url 'account_settings' %}">
+              <i class="fa-solid fa-gear" aria-hidden="true"></i> Account settings
+            </a>
+            {% if is_donor %}
+              <a class="dropdown__item" href="{% url 'donor_profile' %}">
+                <i class="fa-solid fa-user-pen" aria-hidden="true"></i> Donor profile
+              </a>
+            {% elif is_recipient %}
+              <a class="dropdown__item" href="{% url 'recipient_profile' %}">
+                <i class="fa-solid fa-user-pen" aria-hidden="true"></i> Recipient profile
+              </a>
+            {% elif is_hospital %}
+              <a class="dropdown__item" href="{% url 'hospital_profile' %}">
+                <i class="fa-solid fa-hospital" aria-hidden="true"></i> Hospital profile
+              </a>
+            {% endif %}
+            {% if user.is_staff %}
+              <a class="dropdown__item" href="/admin/">
+                <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i> Admin
+              </a>
+            {% endif %}
+            <div class="dropdown__divider"></div>
+            <form method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button class="dropdown__item" type="submit">
+                <i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i> Sign out
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <button class="navbar__toggle" type="button" aria-expanded="false"
+                aria-controls="nav-links" aria-label="Toggle navigation">
+          <i class="fa-solid fa-bars" aria-hidden="true"></i>
+        </button>
+      </div>
+
+    {% else %}
+      <div class="navbar__actions">
+        <a class="navbar__link" href="{% url 'home' %}#how-it-works">How it works</a>
+        <a class="btn btn-secondary btn-sm" href="{% url 'login' %}">Sign in</a>
+        <a class="btn btn-primary btn-sm" href="{% url 'register' %}">Get started</a>
+      </div>
+    {% endif %}
+  </div>
+</nav>

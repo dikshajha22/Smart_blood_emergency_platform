@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Hospital dashboard - LifeLink{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>{{ profile.hospital_name|default:"Your hospital" }}</h1>
+    <p>
+      {{ profile.location_display }}
+      {% if profile.is_verified %}<span class="badge badge--blue"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Verified</span>{% endif %}
+    </p>
+  </div>
+  <div class="btn-group">
+    <a class="btn btn-secondary" href="{% url 'hospital_inventory' %}">
+      <i class="fa-solid fa-warehouse" aria-hidden="true"></i> Manage stock
+    </a>
+    <a class="btn btn-primary" href="{% url 'create_request' %}">
+      <i class="fa-solid fa-plus" aria-hidden="true"></i> New request
+    </a>
+  </div>
+</div>
+
+{% if not profile.is_complete %}
+  <div class="card card--accent mb-4">
+    <div class="card__body row-between row-wrap">
+      <div>
+        <h3 class="mb-0"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Profile {{ profile.completion_percent }}% complete</h3>
+        <p class="text-muted mb-0">Missing: {{ profile.missing_fields|join:", " }}</p>
+      </div>
+      <a class="btn btn-primary" href="{% url 'hospital_profile' %}">Complete profile</a>
+    </div>
+  </div>
+{% endif %}
+
+{% if low_stock %}
+  <div class="alert alert-warning mb-4">
+    <span class="alert__icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
+    <div>
+      <strong>Low stock:</strong>
+      {% for item in low_stock %}{{ item.blood_group }} ({{ item.units_available }} unit{{ item.units_available|pluralize }}){% if not forloop.last %}, {% endif %}{% endfor %}.
+      Consider raising a request.
+    </div>
+  </div>
+{% endif %}
+
+<div class="grid grid-4 mb-5">
+  <div class="stat stat--blue">
+    <span class="stat__icon"><i class="fa-solid fa-file-medical" aria-hidden="true"></i></span>
+    <span class="stat__label">Total requests</span>
+    <span class="stat__value">{{ stats.total_requests }}</span>
+  </div>
+  <div class="stat stat--amber">
+    <span class="stat__icon"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i></span>
+    <span class="stat__label">Open</span>
+    <span class="stat__value">{{ stats.open }}</span>
+  </div>
+  <div class="stat stat--green">
+    <span class="stat__icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+    <span class="stat__label">Fulfilled</span>
+    <span class="stat__value">{{ stats.fulfilled }}</span>
+  </div>
+  <div class="stat stat--red">
+    <span class="stat__icon"><i class="fa-solid fa-droplet" aria-hidden="true"></i></span>
+    <span class="stat__label">Units in stock</span>
+    <span class="stat__value">{{ stats.units_in_stock }}</span>
+  </div>
+</div>
+
+<div class="grid grid-sidebar">
+  <div class="card">
+    <div class="card__header">
+      <h2><i class="fa-solid fa-file-medical" aria-hidden="true"></i> Recent requests</h2>
+      <a class="btn btn-ghost btn-sm" href="{% url 'my_requests' %}">See all</a>
+    </div>
+
+    {% if requests %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead>
+            <tr><th>Patient</th><th>Group</th><th>Units</th><th>Urgency</th><th>Status</th><th>Needed by</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for req in requests %}
+              <tr>
+                <td><a href="{% url 'request_detail' req.pk %}">{{ req.patient_name }}</a></td>
+                <td><span class="blood-badge">{{ req.blood_group }}</span></td>
+                <td>{{ req.units_fulfilled }}/{{ req.units_required }}</td>
+                <td><span class="urgency urgency--{{ req.urgency }}">{{ req.get_urgency_display }}</span></td>
+                <td><span class="status status--{{ req.status }}">{{ req.get_status_display }}</span></td>
+                <td class="text-muted">{{ req.needed_by|date:"d M, H:i" }}</td>
+                <td>
+                  {% if req.is_open %}
+                    <a class="btn btn-primary btn-sm" href="{% url 'request_matches' req.pk %}">Find donors</a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty">
+        <div class="empty__icon"><i class="fa-solid fa-file-medical" aria-hidden="true"></i></div>
+        <h3>No requests raised yet</h3>
+        <p>Raise a request on behalf of a patient and we will rank nearby donors for you.</p>
+        <a class="btn btn-primary" href="{% url 'create_request' %}">Create a request</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card__header">
+        <h3>Blood bank stock</h3>
+        <a class="btn btn-ghost btn-sm" href="{% url 'hospital_inventory' %}">Edit</a>
+      </div>
+      {% if inventory %}
+        <div class="card__body stack">
+          {% for item in inventory %}
+            <div class="row">
+              <span class="blood-badge">{{ item.blood_group }}</span>
+              <div class="progress" style="flex:1;">
+                {% widthratio item.units_available 50 100 as pct %}
+                <div class="progress__bar {% if item.is_low %}progress__bar--amber{% else %}progress__bar--green{% endif %}"
+                     style="width: {{ pct }}%;"></div>
+              </div>
+              <strong style="min-width:30px; text-align:right;">{{ item.units_available }}</strong>
+              {% if item.is_low %}<i class="fa-solid fa-triangle-exclamation" style="color:var(--amber-500);" title="Low stock" aria-hidden="true"></i>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="card__body text-muted text-small">
+          No stock recorded. <a href="{% url 'hospital_inventory' %}">Add your inventory</a>.
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card__header"><h3>Facility</h3></div>
+      <div class="card__body stack">
+        <div class="row-between"><span class="text-muted">License</span><span class="mono">{{ profile.license_number }}</span></div>
+        <div class="row-between"><span class="text-muted">Blood bank</span><span>{% if profile.has_blood_bank %}Yes{% else %}No{% endif %}</span></div>
+        <div class="row-between"><span class="text-muted">Open 24h</span><span>{% if profile.is_24_hours %}Yes{% else %}No{% endif %}</span></div>
+        <div class="row-between"><span class="text-muted">Beds</span><span>{{ profile.bed_count|default:"--" }}</span></div>
+        <a class="btn btn-secondary btn-block" href="{% url 'hospital_profile' %}">Edit hospital profile</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

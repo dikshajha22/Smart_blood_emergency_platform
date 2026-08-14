@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}LifeLink - Find blood donors near you, fast{% endblock %}
+
+{% block container_class %}container-wide{% endblock %}
+
+{% block content %}
+<section class="hero" style="margin: calc(var(--space-6) * -1) 0 var(--space-7);">
+  <div class="container">
+    <div class="hero__inner">
+      <div>
+        <span class="hero__eyebrow">
+          <i class="fa-solid fa-brain" aria-hidden="true"></i>
+          AI-ranked donor matching
+        </span>
+
+        <h1>The right donor,<br>found in seconds.</h1>
+
+        <p class="hero__lead">
+          Donors pin their exact location on the map. When a patient needs blood, we
+          search that map live, rank every compatible donor by how likely they are to
+          actually respond, and send the request straight to them.
+        </p>
+
+        <div class="hero__actions">
+          <a class="btn btn-primary btn-lg" href="{% url 'register' %}">
+            <i class="fa-solid fa-droplet" aria-hidden="true"></i> Become a donor
+          </a>
+          <a class="btn btn-secondary btn-lg" href="{% url 'register' %}">
+            <i class="fa-solid fa-magnifying-glass-location" aria-hidden="true"></i> I need blood
+          </a>
+        </div>
+
+        <div class="hero__stats">
+          <div>
+            <div class="hero__stat-value">{{ total_donors|intcomma }}</div>
+            <div class="hero__stat-label">Registered donors</div>
+          </div>
+          <div>
+            <div class="hero__stat-value">{{ available_donors|intcomma }}</div>
+            <div class="hero__stat-label">Available right now</div>
+          </div>
+          <div>
+            <div class="hero__stat-value">{{ lives_impacted|intcomma }}</div>
+            <div class="hero__stat-label">Requests fulfilled</div>
+          </div>
+          <div>
+            <div class="hero__stat-value">{{ open_requests|intcomma }}</div>
+            <div class="hero__stat-label">Open right now</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="box-shadow: var(--shadow-lg);">
+        <div class="card__header">
+          <h3><i class="fa-solid fa-droplet" aria-hidden="true"></i> Donors by blood group</h3>
+        </div>
+        <div class="card__body stack">
+          {% for row in group_counts %}
+            <div class="row">
+              <span class="blood-badge">{{ row.blood_group|default:"?" }}</span>
+              <div class="progress" style="flex:1;">
+                {% widthratio row.count total_donors 100 as pct %}
+                <div class="progress__bar" style="width: {{ pct }}%;"></div>
+              </div>
+              <strong style="min-width:36px; text-align:right;">{{ row.count }}</strong>
+            </div>
+          {% empty %}
+            <div class="empty">
+              <div class="empty__icon"><i class="fa-solid fa-users" aria-hidden="true"></i></div>
+              <h3>No donors yet</h3>
+              <p>Be the first to register and put your pin on the map.</p>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how-it-works" class="container" style="margin-bottom: var(--space-8);">
+  <div class="page-header">
+    <div class="page-header__title">
+      <h2>How it works</h2>
+      <p>Four steps from emergency to donation.</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <article class="step">
+      <h3>Create your profile</h3>
+      <p>Donors and patients register, then drop a pin on the map at their exact
+         location. Blood group, availability and health details complete the picture.</p>
+    </article>
+    <article class="step">
+      <h3>Search the map live</h3>
+      <p>Patients search in real time by radius and blood group. Only transfusion-safe,
+         eligible and available donors appear.</p>
+    </article>
+    <article class="step">
+      <h3>AI ranks the matches</h3>
+      <p>Each donor is scored on distance, past responsiveness, reliability and
+         readiness, so the most likely responder is at the top - not just the nearest.</p>
+    </article>
+    <article class="step">
+      <h3>Send the request</h3>
+      <p>Pick donors and send. They get it in their inbox and accept or decline.
+         Contact details are shared only after someone accepts.</p>
+    </article>
+  </div>
+</section>
+
+<section class="container" style="margin-bottom: var(--space-8);">
+  <div class="grid grid-3">
+    <article class="feature">
+      <div class="feature__icon"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i></div>
+      <div>
+        <h3>Precise geo-location</h3>
+        <p>Exact haversine distance, not city-name guessing. Search any radius up to 100 km.</p>
+      </div>
+    </article>
+    <article class="feature">
+      <div class="feature__icon"><i class="fa-solid fa-brain" aria-hidden="true"></i></div>
+      <div>
+        <h3>Learns from every response</h3>
+        <p>The ranking model retrains on real accept and decline outcomes, and explains every score.</p>
+      </div>
+    </article>
+    <article class="feature">
+      <div class="feature__icon"><i class="fa-solid fa-shield-heart" aria-hidden="true"></i></div>
+      <div>
+        <h3>Safety rules built in</h3>
+        <p>ABO/Rh compatibility, the 90-day cool-down, age and weight limits are enforced automatically.</p>
+      </div>
+    </article>
+    <article class="feature">
+      <div class="feature__icon"><i class="fa-solid fa-lock" aria-hidden="true"></i></div>
+      <div>
+        <h3>Privacy by default</h3>
+        <p>Browsing the map never reveals a phone number or street address. Contact opens on acceptance.</p>
+      </div>
+    </article>
+    <article class="feature">
+      <div class="feature__icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></div>
+      <div>
+        <h3>Critical auto-dispatch</h3>
+        <p>Mark a request critical and the engine invites the best donors instantly, no clicking required.</p>
+      </div>
+    </article>
+    <article class="feature">
+      <div class="feature__icon"><i class="fa-solid fa-hospital" aria-hidden="true"></i></div>
+      <div>
+        <h3>Hospitals included</h3>
+        <p>Blood banks track stock per group, get low-stock flags and raise requests for their patients.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section class="container">
+  <div class="card card--accent">
+    <div class="card__body text-center">
+      <h2>One donation can save up to three lives</h2>
+      <p class="text-muted">It takes two minutes to register and put your pin on the map.</p>
+      <a class="btn btn-primary btn-lg" href="{% url 'register' %}">Get started</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

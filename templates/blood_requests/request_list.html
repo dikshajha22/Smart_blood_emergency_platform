@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}My blood requests - LifeLink{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>My blood requests</h1>
+    <p>{{ open_count }} still searching for donors.</p>
+  </div>
+  <a class="btn btn-primary" href="{% url 'create_request' %}">
+    <i class="fa-solid fa-plus" aria-hidden="true"></i> New request
+  </a>
+</div>
+
+{% if requests %}
+  <div class="stack">
+    {% for req in requests %}
+      <article class="card">
+        <div class="card__body">
+          <div class="row-between row-wrap mb-4">
+            <div class="row row-wrap">
+              <span class="blood-badge blood-badge--lg">{{ req.blood_group }}</span>
+              <div>
+                <h3 class="mb-0">
+                  <a href="{% url 'request_detail' req.pk %}">{{ req.patient_name }}</a>
+                </h3>
+                <div class="text-small text-muted">
+                  {{ req.units_required }} unit(s) &middot;
+                  raised {{ req.created_at|naturaltime }} &middot;
+                  needed by {{ req.needed_by|date:"d M Y, H:i" }}
+                </div>
+              </div>
+            </div>
+            <div class="row row-wrap">
+              <span class="urgency urgency--{{ req.urgency }}">{{ req.get_urgency_display }}</span>
+              <span class="status status--{{ req.status }}">{{ req.get_status_display }}</span>
+            </div>
+          </div>
+
+          <div class="row row-wrap mb-4">
+            <div style="flex:1; min-width:200px;">
+              <div class="row-between text-small text-muted">
+                <span>Fulfilment</span>
+                <span>{{ req.units_fulfilled }} of {{ req.units_required }} unit(s)</span>
+              </div>
+              <div class="progress mt-4">
+                <div class="progress__bar {% if req.fulfilment_percent == 100 %}progress__bar--green{% endif %}"
+                     style="width: {{ req.fulfilment_percent }}%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row row-wrap">
+            <a class="btn btn-secondary btn-sm" href="{% url 'request_detail' req.pk %}">
+              <i class="fa-solid fa-eye" aria-hidden="true"></i> Details
+            </a>
+            {% if req.is_open %}
+              <a class="btn btn-primary btn-sm" href="{% url 'request_matches' req.pk %}">
+                <i class="fa-solid fa-brain" aria-hidden="true"></i> Find donors
+              </a>
+              <form method="post" action="{% url 'cancel_request' req.pk %}" class="ml-auto"
+                    data-confirm="Cancel this request? All pending donors will be notified.">
+                {% csrf_token %}
+                <button class="btn btn-danger btn-sm" type="submit">
+                  <i class="fa-solid fa-ban" aria-hidden="true"></i> Cancel
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card">
+    <div class="empty">
+      <div class="empty__icon"><i class="fa-solid fa-file-medical" aria-hidden="true"></i></div>
+      <h3>No requests yet</h3>
+      <p>Create a request and we will search the map for compatible donors near you.</p>
+      <a class="btn btn-primary" href="{% url 'create_request' %}">Create a request</a>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
