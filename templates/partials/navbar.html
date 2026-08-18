@@ -3,7 +3,7 @@
   <div class="container navbar__inner">
     <a class="navbar__brand" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'home' %}{% endif %}">
       <span class="navbar__brand-mark" aria-hidden="true"><i class="fa-solid fa-droplet"></i></span>
-      <span>LifeLink</span>
+      <span>HemoLink</span>
     </a>
 
     {% if user.is_authenticated %}
