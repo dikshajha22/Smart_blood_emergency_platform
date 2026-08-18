@@ -1,4 +1,4 @@
-# Smart Blood Donation System (LifeLink)
+# Smart Blood Donation System (HemoLink)
 
 A Django application that connects blood donors and patients by **precise map
 location**, **transfusion compatibility** and **AI-predicted willingness to donate**.
