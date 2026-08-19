@@ -22,7 +22,6 @@ PostGIS, no CSS framework.
 ## Quick start
 
 ```bash
-source smartnv/bin/activate          # existing virtualenv
 pip install -r requirements.txt
 
 python manage.py migrate
